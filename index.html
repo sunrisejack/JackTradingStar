@@ -515,6 +515,8 @@ if (savedModel) els.model.value = savedModel;
 els.model.addEventListener("change", () => localStorage.setItem("jack_chat_model", els.model.value));
 
 autosize();
+
+if (!loadSettings().apiKey) openSettings(true);
 </script>
 </body>
 </html>
