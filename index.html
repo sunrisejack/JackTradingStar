@@ -2,29 +2,519 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>测试页面</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f0f10">
+<title>杰克聊天</title>
 <style>
-  html, body {
-    height: 100%;
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  :root {
+    --bg: #0f0f10;
+    --bg-elev: #1a1a1d;
+    --bg-input: #242428;
+    --border: #2a2a2e;
+    --text: #ececec;
+    --text-dim: #9a9aa0;
+    --accent: #a374ff;
+    --accent-2: #7b5cff;
+    --user-bg: linear-gradient(135deg, #7b5cff 0%, #a374ff 100%);
+    --assistant-bg: #1f1f23;
+    --danger: #ff5d5d;
+    --radius: 18px;
   }
-  body {
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-size: 16px;
+    overflow: hidden;
+  }
+  body { display: flex; justify-content: center; }
+  .app {
+    width: 100%;
+    max-width: 720px;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+  }
+  header {
+    flex: 0 0 auto;
+    padding: 12px 16px;
+    padding-top: calc(12px + env(safe-area-inset-top));
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
+    gap: 12px;
+    background: var(--bg);
+  }
+  .title { font-weight: 600; font-size: 16px; flex: 1; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+  .model-select {
+    background: var(--bg-elev);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    appearance: none;
+    padding-right: 26px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%239a9aa0' d='M5 6 0 0h10z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+  .icon-btn {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  .icon-btn:hover { background: #242428; }
+  .messages {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .messages::-webkit-scrollbar { width: 6px; }
+  .messages::-webkit-scrollbar-thumb { background: #2a2a2e; border-radius: 3px; }
+  .msg { margin-bottom: 14px; display: flex; flex-direction: column; animation: fade 0.2s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .msg.user { align-items: flex-end; }
+  .msg.assistant, .msg.error { align-items: flex-start; }
+  .bubble {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+  .msg.user .bubble {
+    background: var(--user-bg);
+    color: #fff;
+    border-bottom-right-radius: 6px;
+  }
+  .msg.assistant .bubble {
+    background: var(--assistant-bg);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 6px;
+  }
+  .msg.error .bubble {
+    background: rgba(255, 93, 93, 0.1);
+    border: 1px solid rgba(255, 93, 93, 0.3);
+    color: var(--danger);
+  }
+  .empty {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: var(--text-dim);
+    text-align: center;
+    padding: 32px;
+  }
+  .empty h2 { color: var(--text); margin: 12px 0 6px; font-size: 22px; }
+  .empty p { margin: 0; font-size: 14px; }
+  .logo {
+    width: 56px; height: 56px;
+    border-radius: 16px;
+    background: var(--user-bg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 700; color: #fff;
+  }
+  .typing { display: inline-flex; gap: 4px; align-items: center; padding: 4px 0; }
+  .typing span {
+    width: 6px; height: 6px;
+    background: var(--text-dim);
+    border-radius: 50%;
+    animation: bounce 1.2s infinite ease-in-out;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-4px); opacity: 1; }
+  }
+  .composer {
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .composer-inner {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 6px 6px 6px 14px;
+  }
+  textarea {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    font: inherit;
+    resize: none;
+    max-height: 160px;
+    line-height: 1.4;
+    padding: 8px 0;
+    outline: none;
+  }
+  .send-btn {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--user-bg);
+    border: 0;
+    color: #fff;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .send-btn:active:not(:disabled) { transform: scale(0.92); }
+  .send-btn.stop { background: var(--danger); }
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 10;
+    padding: 16px;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 420px;
+    padding: 20px;
+  }
+  .modal h3 { margin: 0 0 16px; font-size: 18px; }
+  .modal label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin: 12px 0 6px;
+  }
+  .modal input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font: inherit;
+    outline: none;
+  }
+  .modal input:focus { border-color: var(--accent); }
+  .modal-actions {
+    display: flex; gap: 8px; justify-content: flex-end;
+    margin-top: 18px;
+  }
+  .btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font: inherit;
+  }
+  .btn.primary {
+    background: var(--accent-2);
+    border-color: var(--accent-2);
     color: #fff;
   }
-  h1 {
-    font-size: 4rem;
-    letter-spacing: 0.1em;
-    text-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  .hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 10px;
+    line-height: 1.5;
   }
 </style>
 </head>
 <body>
-  <h1>你好杰克</h1>
+<div class="app">
+  <header>
+    <div class="title"><span class="dot"></span> 杰克聊天</div>
+    <select class="model-select" id="modelSelect">
+      <option value="Qwen">Qwen</option>
+      <option value="Qwen-json">Qwen-json</option>
+    </select>
+    <button class="icon-btn" id="clearBtn" title="清空对话" aria-label="清空">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+    </button>
+    <button class="icon-btn" id="settingsBtn" title="设置" aria-label="设置">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+
+  <div class="messages" id="messages">
+    <div class="empty" id="emptyState">
+      <div class="logo">J</div>
+      <h2>你好,我是杰克</h2>
+      <p>首次使用请先点右上角齿轮填入 API Key。</p>
+    </div>
+  </div>
+
+  <div class="composer">
+    <div class="composer-inner">
+      <textarea id="input" rows="1" placeholder="发消息……(Enter 发送, Shift+Enter 换行)"></textarea>
+      <button class="send-btn" id="sendBtn" aria-label="发送" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal">
+    <h3>设置</h3>
+    <label for="baseUrlInput">Base URL</label>
+    <input id="baseUrlInput" type="text" placeholder="https://chart.jackedu.vip/xiaoju/v1">
+    <label for="apiKeyInput">API Key</label>
+    <input id="apiKeyInput" type="password" placeholder="必填">
+    <div class="hint">
+      Key 只保存在你这台设备的浏览器里(localStorage),不会上传。
+      因为本站是公开静态页,请勿把 Key 写进代码仓库。
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="cancelSettings">取消</button>
+      <button class="btn primary" id="saveSettings">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEFAULT_BASE = "https://chart.jackedu.vip/xiaoju/v1";
+const LS_KEY = "jack_chat_settings_v1";
+
+const els = {
+  messages: document.getElementById("messages"),
+  empty: document.getElementById("emptyState"),
+  input: document.getElementById("input"),
+  send: document.getElementById("sendBtn"),
+  clear: document.getElementById("clearBtn"),
+  settingsBtn: document.getElementById("settingsBtn"),
+  modal: document.getElementById("settingsModal"),
+  baseUrl: document.getElementById("baseUrlInput"),
+  apiKey: document.getElementById("apiKeyInput"),
+  saveSettings: document.getElementById("saveSettings"),
+  cancelSettings: document.getElementById("cancelSettings"),
+  model: document.getElementById("modelSelect"),
+};
+
+let history = [];
+let controller = null;
+let streaming = false;
+
+function loadSettings() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveSettings(s) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+
+function getConfig() {
+  const s = loadSettings();
+  return {
+    baseUrl: (s.baseUrl || DEFAULT_BASE).replace(/\/+$/, ""),
+    apiKey: s.apiKey || "",
+    model: els.model.value,
+  };
+}
+
+function autosize() {
+  els.input.style.height = "auto";
+  els.input.style.height = Math.min(els.input.scrollHeight, 160) + "px";
+  els.send.disabled = streaming ? false : !els.input.value.trim();
+}
+
+function scrollBottom() {
+  els.messages.scrollTop = els.messages.scrollHeight;
+}
+
+function renderMessage(role, content, kind) {
+  if (els.empty && els.empty.parentNode) els.empty.remove();
+  const wrap = document.createElement("div");
+  wrap.className = "msg " + role + (kind ? " " + kind : "");
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.textContent = content;
+  wrap.appendChild(bubble);
+  els.messages.appendChild(wrap);
+  scrollBottom();
+  return bubble;
+}
+
+function renderTyping() {
+  if (els.empty && els.empty.parentNode) els.empty.remove();
+  const wrap = document.createElement("div");
+  wrap.className = "msg assistant";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  bubble.innerHTML = '<span class="typing"><span></span><span></span><span></span></span>';
+  wrap.appendChild(bubble);
+  els.messages.appendChild(wrap);
+  scrollBottom();
+  return bubble;
+}
+
+function setStreaming(on) {
+  streaming = on;
+  if (on) {
+    els.send.classList.add("stop");
+    els.send.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+    els.send.disabled = false;
+  } else {
+    els.send.classList.remove("stop");
+    els.send.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+    autosize();
+  }
+}
+
+async function sendMessage() {
+  if (streaming) { controller && controller.abort(); return; }
+  const text = els.input.value.trim();
+  if (!text) return;
+
+  const cfg = getConfig();
+  if (!cfg.apiKey) {
+    openSettings(true);
+    return;
+  }
+
+  history.push({ role: "user", content: text });
+  renderMessage("user", text);
+  els.input.value = "";
+  autosize();
+
+  const bubble = renderTyping();
+  setStreaming(true);
+  controller = new AbortController();
+
+  try {
+    const res = await fetch(cfg.baseUrl + "/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + cfg.apiKey,
+      },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: history,
+        stream: true,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok || !res.body) {
+      const errText = await res.text().catch(() => "");
+      throw new Error("HTTP " + res.status + (errText ? ": " + errText.slice(0, 200) : ""));
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+    let acc = "";
+    let started = false;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf("\n")) !== -1) {
+        const line = buffer.slice(0, idx).trim();
+        buffer = buffer.slice(idx + 1);
+        if (!line.startsWith("data:")) continue;
+        const data = line.slice(5).trim();
+        if (data === "[DONE]") continue;
+        try {
+          const obj = JSON.parse(data);
+          const delta = (obj.choices && obj.choices[0] && obj.choices[0].delta && obj.choices[0].delta.content)
+                     || (obj.choices && obj.choices[0] && obj.choices[0].message && obj.choices[0].message.content)
+                     || "";
+          if (delta) {
+            if (!started) { bubble.textContent = ""; started = true; }
+            acc += delta;
+            bubble.textContent = acc;
+            scrollBottom();
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (!started) bubble.textContent = "(没有内容返回)";
+    history.push({ role: "assistant", content: acc });
+  } catch (e) {
+    if (e.name === "AbortError") {
+      bubble.textContent = (bubble.textContent || "") + "\n[已停止]";
+    } else {
+      bubble.parentElement.classList.remove("assistant");
+      bubble.parentElement.classList.add("error", "assistant");
+      bubble.textContent = "请求失败:" + e.message;
+    }
+  } finally {
+    setStreaming(false);
+    controller = null;
+  }
+}
+
+function openSettings(forceKeyFocus) {
+  const s = loadSettings();
+  els.baseUrl.value = s.baseUrl || DEFAULT_BASE;
+  els.apiKey.value = s.apiKey || "";
+  els.modal.classList.add("open");
+  setTimeout(() => (forceKeyFocus ? els.apiKey : els.baseUrl).focus(), 50);
+}
+function closeSettings() { els.modal.classList.remove("open"); }
+
+els.input.addEventListener("input", autosize);
+els.input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+els.send.addEventListener("click", sendMessage);
+els.clear.addEventListener("click", () => {
+  if (streaming) return;
+  history = [];
+  els.messages.innerHTML = "";
+  els.messages.appendChild(els.empty);
+});
+els.settingsBtn.addEventListener("click", () => openSettings(false));
+els.saveSettings.addEventListener("click", () => {
+  saveSettings({
+    baseUrl: els.baseUrl.value.trim() || DEFAULT_BASE,
+    apiKey: els.apiKey.value.trim(),
+  });
+  closeSettings();
+});
+els.cancelSettings.addEventListener("click", closeSettings);
+els.modal.addEventListener("click", (e) => {
+  if (e.target === els.modal) closeSettings();
+});
+
+const savedModel = localStorage.getItem("jack_chat_model");
+if (savedModel) els.model.value = savedModel;
+els.model.addEventListener("change", () => localStorage.setItem("jack_chat_model", els.model.value));
+
+autosize();
+</script>
 </body>
 </html>
